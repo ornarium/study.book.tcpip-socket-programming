@@ -1,0 +1,130 @@
+유닉스/리눅스 고성능 서버 구현
+
+section02. 리얼타임 시그널을 통한 이벤트 기반 입출력 처리
+<유닉스 시그널과 리얼타임 시그널>
+시그널은 하나밖에 저장되지 않는다. 리눅스 시스템에서는 프로세스를 관리하기 위해 프로세스 제어 블록이라는 task_struct 구조체를 가지는데, 이 안에 시그널 필드가 32비트 변수로 이루어져 있어서, 시그널이 생기는 경우 해당 비트가 켜지게 되지만, 몇 번을 받게 되는지는 알수 없다.
+유닉스 시그널의 단점:
+- 유닉스 시그널은 보존되지 않는다(안전하지 않다)
+프로세스는 한 번에 단지 하나의 시그널 만을 유지할수 있다. 그렇기 때문에 시그널 핸들러 함수는 가능한 최단시간 내의 필요한 일을 수행해야 한다.
+- 시그널은 정보를 전달하지 않는다
+시그널 핸들러에서는 번호만을 알수 있고, 어떤 데이터를 얻을 수 있는지는 알 수 없다.
+
+<리얼타임 시그널>
+rcv_rts.c 참조
+snd_rts.c 참조
+
+리얼타임 시그널은 여러개의 시그널을 유지할 수 있으며 부가적인 정보를 저장할 수 있다
+
+시스템에서는 kill -l 명령으로 32위의 값이 존재한다면 리얼타임 시그널을 지원하는 것이다.
+시그널 핸들러에서 siginfo_t를 추가로 받는다.
+void sighandler(int signo, siginfo_t * si);
+
+typedef struct siginfo {
+        int si_signo; /* 시그널 번호 */
+        int si_errno; /* 오류 번호 */
+        int si_code;
+        pid_t si_pid;
+        uid_t si_uid;
+        void *si_addr;
+        union sigval si_value; /* 사용자 정의 데이터 */
+        union {
+              sturct {
+                     int si_band;
+                     int si_fd; /* 이벤트가 발생한 소켓 */
+              } _sigpoll;
+        } _sigfields;
+ } siginfo_t;
+
+ union sigval {
+       int sival_int;
+       void * sival_ptr;
+ }
+
+ <네트워크 프로그램에서의 리얼타임 시그널 적용>
+ calc_server_rts.c
+
+리얼타임 시그널은 보통 스레드풀과 함께 사용된다.
+
+ 1. 소켓파일이 리얼타임 시그널을 발생시키도록 함. fcntl파일 조작 함수 사용
+
+ int sockfd = accept(...);
+ //소켓을 none block, 비동기 모드로 설정
+ fcntl(sockfd, F_SETFL, O_RDWR|O_NONBLOCK|O_ASYNC);
+ //소켓에 이벤트가 발생했을 때 발생할 리얼타임 시그널 설정
+ fcntl(sockfd, F_SETSIG, SIGRTMIN);
+ //시그널을 보낼 프로세스 ID를 설정
+ // 보통은 자기 자신에게 보내도록 설정
+ fcntl(sockfd, F_SETOWN, getpid());
+ fcntl(sockfd, F_SETAUXFL, O_ONESIGFD);
+
+ 2. 리얼타임 시그널을 기다리기
+ #include <signal.h>
+ //시그널을 기다린다
+ int sigwaitinfo(const sigset_t * set, siginfo_t * info);
+ //timeout시간만큼 시그널을 기다린다
+ int sigtimewait(const sigset_t * set, siginfo_t * info,
+ const struct timespec * timeout);
+
+
+ sigset_t signalset;
+ siginfo_t siginfo;
+ int signum, sockfd, revents;
+
+ // SIGRTMIN 시그널을 기다리도록 설정한다
+ sigemptyset(&signalset);
+ sigaddset(&signalset, SIGRTMIN);
+
+ //sigwaitinfo를 이용해서 리얼타임 시그널이 발생하는 것을 기다린다
+ signum = sigwaitinfo(&signalset, &siginfo);
+ if(signum == SIGRTMIN) {
+     sockfd = siginfo.si_fd;
+     revents = siginfo.si_band;
+}
+
+section03. epoll: 이벤트 기반 소켓 연결 방식
+
+echo_server_epoll.c 참조
+
+epoll은 RT signal보다 10%~20% 까지 성능 향상 효과를 볼수 있다.  epoll은
+event+poll로서, 3가지 함수만 가지고 만들수 있어 쉬우며 poll, RT
+signal보다 쉽다.
+
+#include <sys/epoll.h>
+//event pool을 생성
+int epoll_create(int size);
+- size: poll 크기
+// 이벤트 삽입
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event * event);
+- epfd: epoll_create로 생성된 poll지정자
+- op: fd에 대해서 어떤일을 할것인지 지정
+- fd: 이벤트 풀에 넣을 파일 지정자
+- event: 이벤트 풀 구조체이다
+
+EPOLL_CTL_ADD: 소켓을 pool에 추가
+EPOLL_CTL_MOD: 소켓의 설정값을 event로 재설정
+EPOLL_CTL_DEL: 소켓을 pool에서 삭제
+
+struct epoll_event {
+       __uint32_t events; //발생된 이벤트
+       epoll_data_t data; //사용자가 직접 설정할 수 있다
+}
+
+typedef union epoll_data {
+        void * ptr;
+        int fd; //소켓 지정자 저장 and 확인
+        __uint32_t u32;
+        __uint64_t u64;
+} epoll_data_t;
+
+EPOLLIN: 읽을 데이터가 발생
+EPOLLOUT: 쓸 데이터 발생
+EPOLLERR: 파일에서 어떤 오류가 발생
+EPOLLHUP: 파일과의 연결이 끊어진 경우
+
+//이벤트를 기다리고, 발생된 이벤트의 갯수를 리턴
+int epoll_wait(int epfd, struct epoll_event * events, int maxevents, int timeout);
+- epfd: 이벤트를 기다릴 이벤트 풀
+- events: 이벤트 정보가 채워짐
+- maxevents: 최대 기다릴수 있는 이벤트 숫지. 0보다 큰 적당한 숫자 입력
+- timeout: 일정시간 동안 이벤트가 없으면 리턴하기 위해서 사용(t<0: 무한정, n=0: 리턴, n>0: wait)
+

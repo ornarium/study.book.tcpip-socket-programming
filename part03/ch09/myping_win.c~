@@ -1,0 +1,12 @@
+#include "stdafx.h"
+#include <time.h>
+#include "PingClass.h"
+
+#define ICMP_ECHO 8
+#define ICMP_ECHOREPLY 0
+
+#define ICMP_MIN 8
+#define DEF_PACKET_SIZE 32
+#define MAX_PACKET 1024
+
+int in_cksum(u_short *p, int n);

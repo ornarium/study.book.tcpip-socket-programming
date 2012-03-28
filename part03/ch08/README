@@ -1,0 +1,113 @@
+성능 향상을 위한 소켓 제어
+section01. 개념과 설정방법
+
+소켓 옵션 : 운영체제에서 제공하는 소켓 구조체의 각 필드
+
+#include <sys/types.h>
+#include <sys/socket.h>
+
+//지정된 소켓에 옵션을 적용하고, 성공시 0, 실패시 -1리턴
+int setsockopt(int sockfd, int level, int optname,
+const void * optval, int optlen);
+
+//지정된 소켓에 설정되어 있는 옵션 값을 저장하고, 성공시 0, 실패시 -1 리턴
+int getsockopt(int sockfd, int level, int optname,
+const void *optval, int *optlen);
+
+- sockfd: 소켓 옵션을 지정할 파일 지시자
+- level: 옵션의 레벨 결정. 프로토콜 레벨을 결정
+- optname: 구체적 옵션 종류
+- optval: 옵션값을 다루기 위해 사용하는 버퍼 주소
+- optlen: 옵션 버퍼 크기
+
+소켓 옵션 레벨 종류
+1. 소켓 레벨 처리 - SOL_SOCKET
+송수신 버퍼 크기 조절, 브로드 캐스팅 허용, 연결 여부 확인 등 프로토콜 독립적
+성격을 갖는 상위 레벨 제어
+
+2. 프로토콜 레벨 처리 - IPPROTO_IP, IPPROTO_TCP
+네트워크 프로토콜 레벨에서 제어. IP헤더 포함 여부 결정, IP패킷의 TTL(TimeToLive)
+값 변경, Nagle알고리즘 작동정지 등의 프로토콜 종속적 성격의 Low Level 제어
+
+
+실패시 errno 값을 참조하면 어떤 오류가 발생했는지 알수 있음.
+EBADF: sockfd인자가 유효하지 않음
+ENOTSOCK: sockfd인자가 소켓 파일 지시자가 아님
+ENOPROTOOPT: optname이 주어진 레벨에 맞지 않음.
+
+section02. 성능 향상을 위한 소켓 옵션(SOL_SOCKET)의 활용
+1. SO_BROADCAST
+BOOL형식. 브로드 캐스팅을 허용.
+해당 소켓을 사용해서 BROADCAST메시지 전송. 프로토콜의 특성상 UDP에서만 사용가능하며
+브로드 캐스팅 메시지를 지원하는 네트웍(이더넷, token ring, etc)에서만 적용.
+
+sock_broadcast.c 참조
+
+2. SO_DONTROUTE
+BOOL형식. 라우팅 테이블 참조 안함
+일반적으로 라우팅 테이블을 참조해서 가장 빠른 경로를 따라 전송되나, 이 옵션은 라우팅
+테이블 참조를 생략하고 bind함수로 설정한 네트워크 인터페이스(이더넷카드)로 모든 데이터를 보냄.
+
+이 방법은 전체 패킷에 적용되는 것이고, 각 데이터를 보낼 때에만 적용하고자
+한다면 send, sendto 함수에서 MSG_DONROUTE를 넣어주면 데이터별로 가능
+
+실무에서는 거의 사용하지 않는 옵션.
+
+3. SO_KEEPALIVE
+BOOL형식. 주기적 소켓 연결 상태 확인
+
+연결된 상대에게 주기적(2시간 간격)으로 데이터를 보내 응답을 받는데,
+응답이 없거나 reset패킷으로 응답을 받게 되면, 문제가 있다고 판단하여,
+소켓을 해제.
+
+효율적이지 않아 실무에서는 잘 사용안함.
+
+4. SO_LINGER
+linger{} 형식. 소켓을 닫고자 할때 미전송한 데이터가 있을 경우.
+지정한 시간 만큼 대기하고 소켓을 닫는다
+
+5. SO_SNDBUF
+int 형식. 소켓 송신 버퍼 크기를 설정
+
+버퍼 최소 크기 2kbyte
+버퍼 최대 크기 127kbyte
+
+sockopt_bufsize.c 참조
+
+6. SO_RCVBUF
+int 형식. 소켓 수신 버퍼 크기를 설정
+
+버퍼 최소크기 256byte
+버퍼 최대 크기 127kbyte
+
+sockopt_bufsize.c 참조
+
+7. SO_SNDTIMEO
+int형식. 송신함수(send, sendto) 타임아웃을 설정
+
+#define MS 1000
+optvalue = 10 * MS;
+optlen = sizeof(optvalue);
+setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &optvalue, optlen);
+
+8. SO_RCVTIMEO
+int형식. 수신함수(recv, recvfrom) 타임아웃을 설정
+
+#define MS 1000
+optvalue = 10 * MS;
+optlen = sizeof(optvalue);
+setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &optvalue, optlen);
+
+9. SO_REUSEADDR
+BOOL형식. IP주소와 포트 번호를 재사용.
+
+이미 사용중인(바인딩되어) IP주소와 포트번호를 재사용할수 있게 설정.
+서버가 비정상 종료된 경우, 해당 IP주소와 포트를 잡고 있기 때문에 서버를
+재실행해서 bind할때 에러가 나게 된다. 그렇기 때문에 다시 사용할 수
+있도록 설정. 거의 필수 옵션
+
+
+#define TRUE 1
+int optvalue = TRUE;
+int optlen = sizeof(optvalue);
+setsockopt(server_sockfd, SOL_SOCKET, SO_REUSEADDR, &optvalue, optlen);

@@ -1,0 +1,124 @@
+section3. 프로세스 생성과 제어
+<데몬 프로그램>
+daemon.c 참조
+부모프로세스를 닫고, 표준출력과 표준입력을 닫고, setsid로 세션의 리더로 만들면 데몬이 된다.
+
+makedaemon 함수 템플릿
+void makedaemon() {
+     pid_t pid;
+     if((pid = fork()) < 0)
+     	     exit(0);
+
+     else if(pid != 0)
+             exit(0);
+     close(0);
+     close(0);
+     setsid();
+}
+
+section4. 포직스 시그널을 이용한 프로세스간 동기화
+<시그널 함수를 사용한 시그널 핸들러 설정>
+sighandler_t signal(int signum, sighandler_t handler);
+- signum: 처리하기 원하는 시그널 번호
+- handler: 처리를 원하는 signum 처리함수
+
+<kill함수, raise함수를 통한 시그널 전달>
+int kill(pid_t pid, int sig); //해당 pid에 시그널 전달
+int raise(int sig); //자기 자신에게 전달
+
+- pid : 값에 따라 전달되는 프로세스 그룹 또는 프로세스가 달라짐
+
+<네트워크 프로그램과 시그널>
+
+fork를 통해 클라이언트 입력을 처리하였다면, 자식프로세스가 종료될때
+좀비프로세스 방지를 위해서(fork를 시키면 부모 프로세스가 자식
+프로세스를 기다려야 좀비가 생성이 안되므로), 자식프로세스의 종료 시그널 SIGCHILD를
+처리한다
+void zombie_handler() {
+  int status, spid;
+  spid = wait(&status);
+}
+
+int main() {
+  //생략
+  signal(SIGCHLD, (void *)zombie_handler);
+  while(1) {
+    accept();
+    pid = fork();
+    if(pid > 0) {
+    } else (pid == 0) {
+    }
+  }
+}
+
+section5. IPC: 프로세스간 통신
+
+<pipe함수를 통한 파이프 생성>
+pipe.c 참조
+
+#include <unistd.h>
+int pipe(int filedes[2]);
+
+소켓의 경우 양방향이 가능하지만, pipe는 안되므로 입/출력 디스크립트를 만든다
+
+<FIFO: 명명 pipe>
+fifo_server.c
+fifo_client.c
+
+#include <sys/types.h>
+#include <sys/stat.h>
+int mkfifo(const char * pathname, mode_t mode);
+- pathname : 생성하고자 하는 FIFO파일명
+- mode : 일반적인 파일이므로 권한 지정필요
+
+FIFO 통신을 위해 파일을 사용. 입출력을 위해선 두개의 파일이 필요.
+하나의 파일로 입출력을 하게 되면, 당연히 꼬임.
+
+section6. 스레드의 개념과 생성
+
+<pthread 기본 API>
+#include <pthread.h>
+//스레드 생성
+int pthread_create(pthread_t * thread,
+const pthread_attr_t * attr,
+void *(*start_routine)(void *), void *arg);
+- thread: 스레드 식별자
+- attr: 기본 NULL사용. 스레드 특성 지정
+- start_routine: 실제 스레드 함수
+- arg: 함수 인자를 넘김
+
+//해당 스레드의 식별자를 되돌려줌
+pthread_t pthread_self(void);
+
+//해당 thread에 join. 누수가 발생할 수 있으므로, join하여
+//정리해주도록 한다
+int pthread_join(pthread_t th,
+void **thread_return);
+- th: join하고자 하는 스레드의 식별자
+- thread_return: 스레드의 리턴값을 받을 수 있음. 형식에 관계없음.
+
+//join하지 않고, 스레드 종료시 자원을 되돌려주도록 요청.
+//main thread에서 분리시킴. 분리된 스레드는 종료시 pthread_join을 기다리지 않고,
+//모든 자원 즉시 해제
+int pthread_detach(pthread_t th);
+
+//스레드를 종료하면서, 값 리턴
+void pthread_exit(void * retval);
+
+<뮤텍스를 이용한 데이터 동시 접근 문제해결>
+thread_mutex.c 참조
+
+#include <pthread.h>
+//뮤텍스의 초기화와 제거
+pthread_mutex_init(pthread_mutex_t * mutex,
+const pthread_mutex_attr * attr);
+int pthread_mutex_destroy(pthread_mutex_t * mutex);
+- mutex: 초기화 하려는 뮤텍스 객체
+- attr : 뮤텍스 특성 조작
+
+//pthread_mutex_init를 사용하지 않고, 초기화 상수를 통한 전역적 초기화,
+pthread_mutex_t mutex_lock = PTHREAD_MUTEX_INITIALIZER;
+
+//임계영역을 잠그고 풀때 사용
+int pthread_mutex_lock(pthread_mutex_t * mutex);
+int pthread_mutex_unlock(pthread_mutex_t * mutex);

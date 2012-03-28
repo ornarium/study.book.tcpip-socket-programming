@@ -1,0 +1,19 @@
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#define FIFO_READ "/tmp/fifo_c"
+#define FIFO_WRITE "/tmp/fifo_s"
+
+int main() {
+        int fp_w;
+        int fp_r;
+        int i = 0;
+
+        //파일 생성시 권한에 대한 마스크 설정
+        umask(0000);
+        
+}

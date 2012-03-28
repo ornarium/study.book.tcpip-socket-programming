@@ -1,0 +1,56 @@
+section01. 멀티 프로세스 모델
+fork_server.c 참조
+
+장점 :
+1. 구현 쉬움.
+
+단점 :
+1. 클라이언트 접속이 많아질 경우 시스템 성능이 저하될 수 있음
+2. 프로세스간의 데이터 공유 불편
+3. 데이터 공유를 위해 IPC를 활용하면 복잡도 증가됨.
+
+$ gcc fork_server.c -o fork_server
+
+※ SIGCHLD를 사용해서 좀비 프로세스 대처가 되야 한다
+
+section02. 멀티 스레드 모델
+pthread_server.c 참조
+
+장점 :
+1. 속도가 빠르고 가벼움.
+
+단점 :
+1. 한 스레드가 메모리를 잘못 쓰면, 모든 쓰레드에 영향을 줌.
+2. 하나의 머신에서만 사용.
+
+section03. I/O 멀티플렉싱 모델
+select_server.c 참조
+
+소켓의 I/O를 다중화 해서 사용. 각자 수많은 소켓을 생성하지 않고, 하나의
+소켓 I/O를 통해 통신하여 서버 프로그램에 걸리는 부하를 줄여줌.
+
+select 시스템콜을 사용하여 1024개의 파일 디스트립터 테이블을 감시. 단
+I/O의 종료와 몇번째에서 발생했는지는 직접 처리해주어야 함.
+
+/* POSIX 1003.1-2001인 경우 */
+#include <sys/select.h>
+/* 그 이전 */
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+//IO가 발생했는지 파일 디스크립터를 timeout만큼 감시.
+int select(int n, fd_set * readfds, fd_set * writefds,
+fd_set * exceptfds, struct timeval * timeout);
+- readfds: 읽기 상태 I/O를 감시할 파일 디스크립터
+- writefds: 쓰기 상태 I/O를 감시할 파일 디스크립터
+- excetpfds: 예외 상태 I/O를 감시할 파일 디스크립터
+
+//디스크립터 테이블을 초기화
+FD_ZERO(fd_set * set)
+//테이블에 파일 디스크립터 값을 설정
+FD_SET(int fd, fd_set * set)
+//테이블에 파일 디스크립터 값을 해제
+FD_CLR(int fd, fd_set * set)
+//파일 디스크립터에 I/O발생했는지 확인.
+FD_ISSET(int fd, fd_set * set)

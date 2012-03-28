@@ -1,0 +1,23 @@
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <stdio.h>
+
+#ifndef __USE_GNU
+#define __USE_GNU
+#endif
+#include <signal.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#define SA struct socketaddr
+struct cal {
+        int numa;
+        int numb;
+        char op;
+        int result;
+        int error;
+};

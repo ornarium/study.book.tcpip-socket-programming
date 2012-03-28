@@ -1,0 +1,13 @@
+#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
+
+// 시그널 핸들러
+void sighandler(int signo, siginfo_t * si) {
+        //시그널이 리얼타임 시그럴인지, 일반 유닉스 시그널인지 확인
+        if(si->si_code == SI_QUEUE) {
+                printf("User RTS signal %d\n", si->si_pid);
+                printf("Sig Number %d\n", si->si_signo);
+                printf("User Data is %d\n", si->si_value.sival_int);
+        }
+}
