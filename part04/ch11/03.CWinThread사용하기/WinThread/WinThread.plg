@@ -1,0 +1,36 @@
+<html>
+<body>
+<pre>
+<h1>Build Log</h1>
+<h3>
+--------------------Configuration: WinThread - Win32 Debug--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP25A.tmp" with contents
+[
+/nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_AFXDLL" /D "_MBCS" /Fp"Debug/WinThread.pch" /Yu"stdafx.h" /Fo"Debug/" /Fd"Debug/" /FD /GZ   /c 
+"C:\source\ch11\03.CWinThread사용하기\WinThread\MyWinThread.cpp"
+]
+Creating command line "cl.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP25A.tmp" 
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP25B.tmp" with contents
+[
+/nologo /subsystem:windows /incremental:yes /pdb:"Debug/WinThread.pdb" /debug /machine:I386 /out:"Debug/WinThread.exe" /pdbtype:sept 
+".\Debug\WinThread.obj"
+".\Debug\WinThreadDlg.obj"
+".\Debug\StdAfx.obj"
+".\Debug\WinThread.res"
+".\Debug\MyWinThread.obj"
+]
+Creating command line "link.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP25B.tmp"
+<h3>Output Window</h3>
+Compiling...
+MyWinThread.cpp
+Linking...
+
+
+
+<h3>Results</h3>
+WinThread.exe - 0 error(s), 0 warning(s)
+</pre>
+</body>
+</html>

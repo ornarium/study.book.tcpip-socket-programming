@@ -1,0 +1,57 @@
+18장. 꼭 알아야할 네트워크 문제 해결
+
+section03. 소켓 타임아웃
+<클라이언트 비정상 종료>
+정상적인 연결을 하려면 최초의 세션이 맺어지기 위해 3웨이 셰이킹 핸드 기법에 의해 패킷 교환이 일어남.
+그리고 정상적인 종료의 경우 4웨이 핸드 셰이킹이 일어남. (클라이언트 FIN-ACK 패킷 교환, 서버쪽에서 FIN_ACK패킷 교환 후 close호출 후 다시 한번 FIN-ACK 패킷 교환 발생. 총 4번의 패킷 교환)
+
+비정상적인 애플리케이션의 종료는 커널이 알아서 처리. 보통 종료 시그널을 받았을 경우, tcpdump를 해보면 커널에서 프로세스를 정리할때 정리되는 파일 지정자가 소켓일 경우 알아서 FIN-ACK 패킷을 보내 정상종료시키기 때문.
+
+<네트워크 단절>
+클라이언트가 read중에 네트워크 단절이 일어나면 영원히 blocking될수 있음. 이때에 네트워크 단절에 대처할수 있는 방법이 타임아웃을 걸어주는 것.
+
+1. alarm함수를 이용한 timeout
+alarm을 이용해 일정시간 입력이 없으면 SIGALRM이 전달되도록 함. 그러나 복잡한 코드에는 사용하지 말것을 권장. SIGALRM의 경우 alarm함수 외에도 다른 함수에서도 발생하는 경우가 있기 때문.
+
+//시그널 설정
+signal 설정 SIGALRM:
+
+//10초 후에 SIGALRM이 전달되도록 설정
+alarm(10);
+if(read(...) < 0) {
+    //만약, 인터럽트를 받고 read함수가 리턴된 경우
+     if(errno == EINTR) {
+         //close등의 작업
+         close();
+        ...
+     }
+ }
+
+ read, write 등의 함수가 인터럽트를 받아서 리턴될 경우 errno값을 ENITR로 설정하므로 errno값을 한번만 검사해주면 문제없다.
+
+ 2. select 함수와 poll함수의 타임아웃 이용
+ select함수와 poll함수를 입출력 다중화가 아니라, 타임아웃을 위해서도 유용하게 사용. select를 사용하면 alarm에 비해 신뢰성있게 서버를 구성 가능. 그러나 입출력 다중화까지 지원하기 위해서 모든 입력에 대한 타임아웃을 검사하므로 적당치 않음.
+
+ struct timeval tv;
+ int state;
+
+ //타임아웃 시간을 약 5초로 설정
+ tv.tv_sec = 5;
+ tv.tv_usec = 10;
+
+ //select 함수에 타임아웃을 적용
+ state = select(client_sockfd + 1, &readfds, (fd_set *)0, (fd_set *)0, &tv);
+ switch(state) {
+ //만약, 5초 안에 아무런 입력이 없었다면 타임아웃 발생
+ case 0:
+   printf("timeout error\n");
+   break;
+ //5초안에 입력이 들어온 경우
+default:
+   read(..., ..., ...);
+   ...
+   ...
+   break;
+ }
+ close(client_sockfd);
+

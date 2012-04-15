@@ -1,0 +1,161 @@
+section08. IOCP
+
+Input Output Completion Port의 머릿글자로서 NT 계열 컴퓨터에서 가장 빠른 네트워크 성능을 내는 I/O모델. IOCP는 서버프로그램을 위해서 제공되는 고성능 I/O모델이며, 기술적으로는 오버랩드 I/O와 이 I/O를 처리하는 "스레드 풀"을 잘 엮어서 만든 스레드 모델
+
+1. IOCP객체를 생성한다
+2. Overlapped I/O로 WSASend/WSARecv함수를 호출하면 완료결과가 IOCP완료 패킷 큐에 쌓임.
+3. 작업 스레드들이 완료 패킷을 받아 처리.
+
+작업스레드들이 여러개일때 각 스레드들은 모두 GetQueuedCompletionStatus를 호출하여 대기상태가 되는데, I/O완료 패킷이 발생되었을 때 제일 나중에 GetQueuedCompletionStatus함수를 호출한 스레드를 깨움. 결국, LIFO큐로 스레드를 관리함. 그 이유는 바로 전 작업을 했던 스레드가 큐에들어간뒤 다른 스레드가 깨어나게 되면 불필요한 컨텍스트 스위칭이 일어나 성능악화가 생길수 잇기 때문.
+
+IOCP핸들을 새로 생성하는 일과 첫 번째 파일 핸들 인자에 소켓 핸들을 넣어 IOCP에 참여 시키는 기능.
+
+HANDLE CreateIoCompletionPort(
+  HANDLE FileHandle,
+  HANDLE ExistingCompletionPort,
+  ULONG_PTR CompletionKey,
+  DWORD NumberOfConcurrentThreads
+);
+- FileHandle: IOCP에 참여시킬 파일 또는 소켓 핸들
+- ExistingCompletionPort: IOCP핸들
+- CompletionKey: 파일 또는 소켓과 쌍을 이루는 키. 나중에 어떤 소켓인지 식별하기 위한 Tag값
+- NumberOfConcurrentThreads: 동시에 실햄될수 있는 작업 스레드 수. 0으로 하면 CPU당 하나의 작업 스레드를 생성. 동시에 실행시킬 최대 스레드 갯수를 의미. 작업스레드를 10개를 생성했더라도 이 갯수가 1이면 1개만 작동함을 의미.
+
+적절한 NumberOfConcurrentThreads수와 작업자 스레드수에 대한 기준은 정해진것은 없으나 MSDN: "INFO: Design Issues When Using IOCP in a Winsock Server'를 통해서 0으로 주기를 권장함.
+MSDN: 'KB Writing WIndows NT Server Applications in MFC Using I/O Completion Ports(Ruediger Asche, September 1996)'에서 NumberOfConcurrentThreads값은 IOCP내의 많은 처리시간이 필요한 완료 I/O패킷 갯수와 관련이 있다고 말함. 
+Programming ServerSide Applications for Windows 2000에서는 작업 스레드 갯수는 (CPU 갯수*2) 권장. 경험적인 값을 찾으라는 것.
+
+* IOCP핸들 생성
+HANDLE hIocp;
+hIocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
+
+* IOCP 참여
+SOCKET hSocket = WSASocket(..., WSA_FLAG_OVERLAPPED);
+ ...
+CreateIoCompletionPort((HANDLE)hSocket, g_hIocp, 0, 0);
+
+
+* CompletionKey사용 예제
+typedef struct _SOCKET_CONTEXT{
+//IOCP 소켓 컨텍스트(소켓 하나하나를 식별하기 위한 정보 구조체)
+  SOCKET hSocket;
+} SOCKET_CONTEXT;
+...
+SOCKET hCliekt; //억셉트 된 상황이라고 가정
+int nSockLen = sizeof(saRemote);
+//새로운 클라이언트를 받아들임
+hClient = accept(g_hListen, (PSOCKADDR)&saRemote, &nSockLen);
+SOCKET_CONTEXT * pSocket = new SOCKET_CONTEXT;
+pSocket->hSocket = hCLient;
+
+//억셉트된 소켓을 IOCP에 참여
+CreateIoCompletionPort((HANDLE)hClient, g_hIocp, (DWORD)pSocket, 0);
+
+* 작업스레드 생성
+//IOCP 처리 스레드를 생성
+SYSTEM_INFO si;
+DWORD i;
+
+GetSystemInfo(&si);
+for(i = 0; i < si.dwNumberOfProcessors * 2; ++i)
+  _beginthread(_IOCPThread, 0, 0);
+...
+void _IOCPThread(void * p) {
+  SOCKET_CONTEXT * pSocket = NULL;
+  IO_CONTEXT * pIO = NULL;
+ 
+  while(1) {
+    //작업 스레드들은 아래 함수를 호출해서 I/O완료 패킷 큐에서
+    //완료 패킷을 하나씩 꺼내서 작업하게 됨
+    GetQueuedCompletionStatus(g_hIocp, &dwTransfer, (LPDWORD)&pSocket, (LPOVERLAPPED *)&pIO, INFINITE);
+    ...
+   }
+}
+
+BOOL GetQueuedCOmpletionStatus(
+  HANDLE CompletionPort,
+  LPWORD lpNumberOfBytes,
+  PULONG_PTR lpCompletionKey,
+  LPOVERLAPPED * lpOverlapped,
+  DWORD dwMilliseconds
+);
+- CompletionPort: 어떤 IOCP의 완료 패킷 큐에서 완료 패킷 큐에서 완료 패킷을 뽑아올 것인지 IOCP핸들을 정함.
+- lpNumberOfBytes: 해당 I/O작업에서 보내거나 받아진 바이트 수를 의미
+- lpCompletionKey: 어떤 소켓이 했는지 알기 위해(어떤 소켓인지 구분)
+- lpOverlapped: 어떤 I/O작업(WSASend/WSARecv)인지 알기 위해 오버랩드 객체 리턴(어떤 작업인지 구분)
+- dwMilliseconds: 타임아웃 값
+
+* IOCP에 쓰일 오버랩드 구조체
+//IOCP I/O 컨텍스트
+#define IO_TYPE_SEND 0
+#define IO_TYPE_RECV 1
+
+typedef struct _IO_CONTEXT {
+  WSAOVERLAPPED ov;
+  BOOL type;
+  char buf[100];
+  WSABUF wsabuf;
+} IO_CONTEXT;
+
+WSASend/WSARecv함수를 호출하기 전 IO_CONTEXT객체 생성해서 오버랩드 인자에 넣어두면 I/O가 완료되어 GetQueuedCompletionStatus함수의 lpOverlapped인자로 받아볼수 있음
+
+//WSARecv작업 요청
+IO_CONTEXT* pIO = new IO_CONTEXT;
+ZeroMemory(pIO, sizeof(IO_CONTEXT));
+pIO->wsabuf.buf = pIO->buf;
+pIO->wsabuf.len = 100;
+pIO->type = IO_TYPE_RECV;
+
+nError = WSARecv(pSocket->hSocket, &pIO->wsabuf, 1, &dwRecv, &dwFlags, &pIO->ov, NULL);
+...
+void _IOCPThread(void * p) {
+  SOCKET_CONTEXT* pSocket = NULL;
+  IO_CONTEXT * pIO = NULL;
+  BOOL bRet;
+  DWORD dwTransfer;
+  while(1) {
+    bRet = GetQueuedCompletionStatus(g_hIocp, &dwTransfer, (LPDWORD) &pSocket, (LPOVERLAPPED*) &pIO, INFINITE);
+    if(pIO) {
+      ...
+    }
+  }
+}
+
+작업스레드에게 I/O완료 패킷 처리와 상관없이  다른 처리의 용도로 메시지를 전달하고 싶을 경우 
+BOOL PostQueuedCompletionStatus(
+  HANDLE CompletionPort,
+  DWORD dwNumberOfBytesTransferred,
+  ULONG_PTR dwCompletionKey,
+  LPOVERLAPPED lpOverlapped
+);
+이 함수를 사용해서 IOCP내의 I/O완료 패킷 큐에 패킷을 큐에 직접 추가가능. I/O오나료 처리완느 상관없는 작업들이므로 lpOverlapped는 NULL을 넣고 dwCompletionKey에 처리해야할 메시지를 담아보냄.
+
+#define MY_MSG_HELLO (WM_APP + 100)
+...
+//완료 패킷 큐에 사용자 메시지 추가
+PostQueuedCompletionStatus(g_hIocp, 0, MY_MSG_HELLO, NULL);
+...
+void _IOCPThread(void * p) {
+  SOCKET_CONTEXT * pSocket = NULL;
+  IO_CONTEXT * pIO = NULL;
+
+  while(1) {
+    //작업 스레드들은 아래 함수를 호출해 I/O완료 패킷큐에서 하나식 꺼내 작업
+    GetQueuedCompletionStatus(g_hIocp, &dwTransfer, (LPDWORD)&pSocket, (LPOVERLAPPED*) &pIO, INFINITE);
+    ...
+    if(pIO == NULL) {
+      //사용자 메시지가 도착
+      if((DWORD)pSocket == MY_MSG_HELLO)
+         //해당 사용자 메시지 처리
+    } else
+    ...
+  }
+}
+
+
+* C런타임 구동함수인 _beginthread사용하게 되면, 비주얼 C++의 [Project]->[Settings]->[C/C++]탭에서 /MLd를 /MTd로 바꾼다.
+
+* 예제의 코드는 기존의 WSAAsyncSelect 서버 예제코드를 기반으로 WSAAsyncSelect를 사용하여 메시지 기반으로 FD_ACCEPT를 처리하고 억셉트된 소켓들을 IOCP로 각 클라이언트와 통신.
+
+# 근데 예제 프로그램의 화면이 안나타는 이유는 왜일까... 분명 동작이 되는 TcpServer 소스를 가져다가 추가만했을 뿐인데..
+## 이상하다. Class Name을 바꾸니 실질적인 화면이 나타난다. 아무래도 윈도우 내에서 체크하는 녀석이 있을지도 모르겠다는 생각이 든다.

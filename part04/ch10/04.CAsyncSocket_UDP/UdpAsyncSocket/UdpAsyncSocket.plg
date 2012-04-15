@@ -1,0 +1,51 @@
+<html>
+<body>
+<pre>
+<h1>Build Log</h1>
+<h3>
+--------------------Configuration: UdpAsyncSocket - Win32 Debug--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating command line "rc.exe /l 0x412 /fo"Debug/UdpAsyncSocket.res" /d "_DEBUG" /d "_AFXDLL" "C:\source\ch10\04.CAsyncSocket_UDP\UdpAsyncSocket\UdpAsyncSocket.rc"" 
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP226.tmp" with contents
+[
+/nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_AFXDLL" /D "_MBCS" /Fp"Debug/UdpAsyncSocket.pch" /Yu"stdafx.h" /Fo"Debug/" /Fd"Debug/" /FD /GZ   /c 
+"C:\source\ch10\04.CAsyncSocket_UDP\UdpAsyncSocket\UdpAsyncSocket.cpp"
+"C:\source\ch10\04.CAsyncSocket_UDP\UdpAsyncSocket\UdpAsyncSocketDlg.cpp"
+"C:\source\ch10\04.CAsyncSocket_UDP\UdpAsyncSocket\UdpSocket.cpp"
+]
+Creating command line "cl.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP226.tmp" 
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP227.tmp" with contents
+[
+/nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_AFXDLL" /D "_MBCS" /Fp"Debug/UdpAsyncSocket.pch" /Yc"stdafx.h" /Fo"Debug/" /Fd"Debug/" /FD /GZ   /c 
+"C:\source\ch10\04.CAsyncSocket_UDP\UdpAsyncSocket\StdAfx.cpp"
+]
+Creating command line "cl.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP227.tmp" 
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP228.tmp" with contents
+[
+/nologo /subsystem:windows /incremental:yes /pdb:"Debug/UdpAsyncSocket.pdb" /debug /machine:I386 /out:"Debug/UdpAsyncSocket.exe" /pdbtype:sept 
+.\Debug\UdpAsyncSocket.obj
+.\Debug\UdpAsyncSocketDlg.obj
+.\Debug\StdAfx.obj
+.\Debug\UdpAsyncSocket.res
+.\Debug\UdpSocket.obj
+]
+Creating command line "link.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP228.tmp"
+<h3>Output Window</h3>
+Compiling resources...
+Compiling...
+StdAfx.cpp
+Compiling...
+UdpAsyncSocket.cpp
+UdpAsyncSocketDlg.cpp
+UdpSocket.cpp
+Generating Code...
+Linking...
+
+
+
+<h3>Results</h3>
+UdpAsyncSocket.exe - 0 error(s), 0 warning(s)
+</pre>
+</body>
+</html>
